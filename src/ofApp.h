@@ -46,6 +46,7 @@ public:
 	ofParameter<float> cropSizeW;
 	ofParameter<float> cropSizeH;
 	//yolo gui
+	ofParameter<string> detectionLabel;
 	ofParameter<float> maxRectAreaDetection;
 	ofParameter<float> percentPersonDetected;
 	ofParameter<float> maxOverlap;

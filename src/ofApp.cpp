@@ -14,21 +14,18 @@ ofxCv::RectTracker& ofApp::getTracker() {
 //------------------------------------------------------------
 void ofApp::setup() 
 {
+	//////////
+	//Darknet Yolo2 Data
 	std::string cfgfile = ofToDataPath( "cfg/YOLOv2_608x608.cfg" );	//cfg/yolo-voc-YOLOv2.cfg	//yolo9000.cfg							//GPU (VOC) tiny-yolo-voc.cfg
 	std::string weightfile = ofToDataPath( "YOLOv2_608x608_COCO_trainval.weights" );	// yolo-voc-YOLOv2.weights //yolo9000.weights//yolo.weights		//GPU (VOC) tiny-yolo-voc.weights
 	std::string namesfile = ofToDataPath( "cfg/coco.names" );	//cfg/voc.names	//cfg/9k.names								//GPU (VOC) cfg/voc.names
     
 	darknet.init( cfgfile, weightfile, namesfile);//"" OR namesfile
 
-	///////////////////
-	//tracker Configuratio // TODO add Gui
-	tracker.setPersistence(300);
-	tracker.setMaximumDistance(100);
-	tracker.setSmoothingRate(.3);
 
+	///////////
 	//GUI
 	gui.setup();
-	
 	// if a detected object overlaps >maxOverlap with another detected
 	// object with a higher confidence, it gets omitted
 	gui.add(bVideoPlayer.set("bVideoPlayer", true));
@@ -38,21 +35,21 @@ void ofApp::setup()
 	gui.add(bSwapX.set("bSwapX", false));
 	gui.add(bSwapY.set("bSwapY", false));
 
-
 	gui.add(cropSizeX.set("CropX", 0.10, 0, 1));
 	gui.add(cropSizeY.set("CropY", 0.20, 0, 1));
 	gui.add(cropSizeW.set("CropW", 0.70, 0, 1));
 	gui.add(cropSizeH.set("CropH", 0.70, 0, 1));
 	
 	//YOLO GUI DETECTIONS
-	gui.add(bDrawYoloInfo.set("Draw Yolo Info", true));
-	gui.add(percentPersonDetected.set("% probabily", 0.25, 0.001, 1));
+	gui.add(bDrawYoloInfo.set("Draw Yolo Info", false));
+	gui.add(detectionLabel.set("Filtered Label", "person"));
+	gui.add(percentPersonDetected.set("Probability", 0.25, 0.001, 1));
 	gui.add(maxOverlap.set("Max Overlap", 0.25, 0.01, 1));
 	//gui.add(maxRectAreaDetection.set("MaxRectAreaDetection", 140, 10, 300));
 	
 	//TRACKER GUI options //TODO check how to detect changes values
 	last_trackerPersistence = 200;
-	gui.add(trackerPersistence.set("trackerPersistence", 200, 10, 300)); // milis time persistence blob tracked
+	gui.add(trackerPersistence.set("trackerPersistence", 200, 1, 50)); // milis time persistence blob tracked
 	
 	last_trackerMaximimDistance = 50;
 	gui.add(trackerMaximimDistance.set("trackerMaxDistance", 50, 1, 200)); // depends on the camera resolution
@@ -62,6 +59,14 @@ void ofApp::setup()
 
 	gui.loadFromFile("settings.xml");
 
+
+	///////////////////
+	//tracker Configuratio // TODO add Gui
+	tracker.setPersistence(trackerPersistence);
+	tracker.setMaximumDistance(trackerMaximimDistance);
+	tracker.setSmoothingRate(trackerSmoothingRate);
+
+	//////////////////
 	//OSC
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT);
@@ -181,43 +186,49 @@ void ofApp::update()
 
 //-----------------------------------------
 void ofApp::send_OSC_Data_AllInBlobs() {
-	//Adaptation
-	int numBlobsDetected = boundingRects.size();
-
-	//TODO Decide desired data and parameters to send
+	
+	int numTrackedObjects = tracker.getCurrentRaw().size();
+	//cout << "numTrackedObjects = " << numTrackedObjects << endl;
+	
+	//Start OSC package
 	ofxOscMessage m;
 	m.clear();
 	m.setAddress("/GameBlobAllIn");//TODO tracking Label
-	m.addIntArg(numBlobsDetected); //Add the number of Blobs detected in order to read them properly and easy
+	m.addIntArg(numTrackedObjects); //Add the number of Blobs detected in order to read them properly and easy
 
-	for (int i = 0; i < boundingRects.size() > 0; i++) {
-		cv::Point2f centerBlobi = cv::Point2f(boundingRects[i].x + boundingRects[i].width*.5, boundingRects[i].y + boundingRects[i].height*.5);
-
+	//Later tracker.getDeadLabels().size();
+	for (int i = 0; i < numTrackedObjects; i++) {
+		
+		ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
+		cv::Point2f centerBlobi = cv::Point2f(cur.object.x + cur.object.width*.5, cur.object.y + cur.object.height*.5);
+		
 		float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
 		float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
-		
+
 		//if swap values acive:
 		if (bSwapX)resumedPosX = 1 - resumedPosX;
 		if (bSwapY)resumedPosY = 1 - resumedPosY;
-		
+
 		m.addFloatArg(resumedPosX);
 		m.addFloatArg(resumedPosY);
 
 		//Size W H 
-		m.addFloatArg(boundingRects[i].width);
-		m.addFloatArg(boundingRects[i].height);
+		m.addFloatArg(cur.object.width);
+		m.addFloatArg(cur.object.height);
 
 		//Adde info to the message
 		//for Tracking add int ID & int TIME
-		int idAux = tracker.getCurrentLabels()[i];
+		int idAux = cur.getLabel();
 		m.addIntArg(idAux); //Sending ID Label
-		int timeAux = tracker.getAge(idAux);
+		int timeAux = cur.getAge();
 		m.addIntArg(timeAux); //Sending Time Tracked
-		if (detections.size() > i) {
-			float auxProb = detections[i].probability;
-			m.addFloatArg(auxProb);
-		}
-		
+
+		//This must be done using FollowerTracker class
+		//if (detections.size() > i) {
+		//	float auxProb = detections[i].probability;
+		//	m.addFloatArg(auxProb);
+		//}
+
 		sender.sendMessage(m, false);
 	}
 
