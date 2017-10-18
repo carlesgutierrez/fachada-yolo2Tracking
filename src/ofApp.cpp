@@ -228,9 +228,9 @@ void ofApp::send_OSC_Data_AllInBlobs() {
 		//	float auxProb = detections[i].probability;
 		//	m.addFloatArg(auxProb);
 		//}
-
-		sender.sendMessage(m, false);
 	}
+
+	sender.sendMessage(m, false);
 
 }
 
