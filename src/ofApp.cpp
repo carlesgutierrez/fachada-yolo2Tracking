@@ -155,11 +155,11 @@ void ofApp::update()
 		detections.clear();
 		detections = darknet.yolo(cropedArea, thresh, maxOverlap);
 
+		boundingRects.clear();
+
 		//Pre clear
 		if (detections.size() > 0) {
-			boundingRects.clear();
-
-	
+			
 			for (detected_object d : detections)
 			{
 				// optionally, you can grab the 1024-length feature vector associated
@@ -293,5 +293,8 @@ void ofApp::drawTracking() {
 void ofApp::keyPressed(int key) {
 	if (key == 's') {
 		gui.saveToFile("settings.xml");
+	}
+	if (key == 'c') {
+		videoGrabber.videoSettings();
 	}
 }

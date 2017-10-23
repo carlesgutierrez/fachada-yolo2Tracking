@@ -74,5 +74,5 @@ public:
 	//OSC CONFIG
 	bool bResetHostIp = false;
 	int PORT = 12345;
-	string HOST = "127.0.0.1";//MLP: "192.168.2.254";
+	string HOST = "127.0.0.1";//MLP: "192.168.2.254"; //192.168.1.158
 };
