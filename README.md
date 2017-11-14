@@ -12,7 +12,8 @@ For installation:
      - ofxGui
      - ofxOsc
      
- * Require speciful COCO files. Download from Yolo: https://pjreddie.com/darknet/yolo/
+ * Require specific weights COCO  ( https://pjreddie.com/media/files/yolo.weights ) From Yolo: https://pjreddie.com/darknet/yolo/
+    - cfg and names are already included in this repo- 
  
  
   
