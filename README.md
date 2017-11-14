@@ -6,7 +6,7 @@ Yolo2 uses GPU with Cuda8/9.
 
 For installation:
  * Required addons: 
-     - ofxDarknet: read the Readme. 
+     - ofxDarknet: Follow setup stepts for your platform from then Readme. README.md 
      - ofxCv: stable version and reset this propertie: c++ -> output files --> Object File name --> $(IntDir)/%(RelativeDir)/
      - ofxOpenCv 
      - ofxGui
