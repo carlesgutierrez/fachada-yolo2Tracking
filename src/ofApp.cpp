@@ -1,4 +1,8 @@
 #include "ofApp.h"
+
+using namespace cv;
+using namespace ofxCv;
+
 //--------------------------------------------------------------
 cv::Vec2f ofApp::getVelocity(unsigned int i) const {
 	return tracker.getVelocity(i);
@@ -11,6 +15,7 @@ unsigned int ofApp::getLabel(unsigned int i) const {
 ofxCv::RectTracker& ofApp::getTracker() {
 	return tracker;
 }
+
 //------------------------------------------------------------
 void ofApp::setup() 
 {
@@ -28,7 +33,7 @@ void ofApp::setup()
 	gui.setup();
 	// if a detected object overlaps >maxOverlap with another detected
 	// object with a higher confidence, it gets omitted
-	gui.add(bVideoPlayer.set("bVideoPlayer", true));
+	gui.add(bVideoPlayer.set("bVideoPlayer", false));
 	vector<ofVideoDevice> auxListDevices = videoGrabber.listDevices();
 	cout << "Num available VideoGrabber Devices =" << auxListDevices.size() << endl;
 	gui.add(idVideoGrabber.set("Device Id ", 0, 0, auxListDevices.size()));
@@ -56,6 +61,16 @@ void ofApp::setup()
 	
 	last_trackerSmoothingRate = 0.3;
 	gui.add(trackerSmoothingRate.set("trackerSmoothingRate", 0.3, 0.1, 1)); //
+
+	//OpicalFlow GUi
+	gui.add(bFlowManualMouseSel.set("Manual Mouse Sel", false));
+	gui.add(numKeypointsInside.set("Flow keypointsInside Items", 10, 3, 30));
+	gui.add(bOpticalFlow.set("Draw bOpticalFlow", false));
+	gui.add(colorFeatureLines.set("Color lines", ofColor::indianRed));
+	
+	//SocioGrama
+	gui.add(bSociograma.set("Draw Sociograma", false));
+	gui.add(colorSociograma.set("Color Sociograma", ofColor::blueSteel));
 
 	gui.loadFromFile("settings.xml");
 
@@ -179,6 +194,14 @@ void ofApp::update()
 		//Update tracker
 		tracker.track(boundingRects);
 
+		//TEST
+		//Optical Flow Test with the first Bounding detected
+		if (bOpticalFlow) {
+			updateHardestBlobTracked();
+			flow.calcOpticalFlow(cropedArea);
+		}
+
+
 		//If Data Tracked then Send OSC
 		send_OSC_Data_AllInBlobs();
 	}
@@ -256,12 +279,66 @@ void ofApp::draw()
 	//Draw Tracker results
 	drawTracking();
 
+	ofEnableAlphaBlending();
+	if (bSociograma) {
+		ofSetColor(colorSociograma);
+		drawSociogramaConnections();
+	}
+	if (bOpticalFlow) {
+		ofSetColor(colorFeatureLines);
+		draw_OldestItem_OpticalFlowFeatures();
+	}
+	ofDisableAlphaBlending();
 
 	ofSetColor(200);
-	ofDrawBitmapStringHighlight("Fps=" + ofToString(ofGetFrameRate(), 0), 10, 10);
+	ofDrawBitmapStringHighlight("Fps=" + ofToString(ofGetFrameRate(), 0), ofGetWidth() - 30, 10);
+
+	//OpticalFlow
+	if (bOpticalFlow) {
+		flow.draw();
+		if (ofGetMousePressed()) {
+			ofNoFill();
+			ofDrawRectangle(rect);
+		}
+	}
 
 	//GUI
 	gui.draw();
+}
+//----------------------------------------------------------
+void ofApp::drawSociogramaConnections() {
+	for (int i = 0; i < tracker.getCurrentRaw().size(); i++) {
+		ofxCv::TrackedObject<cv::Rect> curI = tracker.getCurrentRaw()[i];
+		for (int j = 0; j < tracker.getCurrentRaw().size(); j++) {
+			ofxCv::TrackedObject<cv::Rect> curJ = tracker.getCurrentRaw()[j];
+			drawLineConnection(ofVec2f(curI.object.x, curI.object.y), ofVec2f(curJ.object.x, curJ.object.y), 1);
+			// << "drawinlines curI.object.x = " << curJ.object.x << "curI.object.y = " << curJ.object.y << endl;
+		}
+	}
+}
+
+//----------------------------------------------------------
+void ofApp::draw_OldestItem_OpticalFlowFeatures() {
+	for (int i = 0; i < flow.getCurrent().size(); i++) {
+		ofPoint curI = flow.getCurrent()[i];
+		for (int j = 0; j < flow.getCurrent().size(); j++) {
+			ofPoint curJ = flow.getCurrent()[j];
+			drawLineConnection(ofVec2f(curI.x, curI.y), ofVec2f(curJ.x, curJ.y), 1);
+			// << "drawinlines curI.object.x = " << curJ.object.x << "curI.object.y = " << curJ.object.y << endl;
+		}
+	}
+}
+//----------------------------------------------------------
+void ofApp::drawLineConnection(ofVec2f posBlobi, ofVec2f posBlobn, float gros)
+{
+
+	ofPushStyle();
+	ofSetLineWidth(gros);
+
+	//Draw a line between items
+	ofLine(posBlobi, posBlobn);
+
+	ofPopStyle();
 }
 
 //----------------------------------------------------------
@@ -297,4 +374,95 @@ void ofApp::keyPressed(int key) {
 	if (key == 'c') {
 		videoGrabber.videoSettings();
 	}
+
+	if (key == ' ') {
+		if (bOpticalFlow) {
+			int oldestId = findOldestBlobId();
+			if (oldestId > -1) {
+				ofxCv::TrackedObject<cv::Rect> oldItem = tracker.getCurrentRaw()[oldestId];
+				ofRectangle auxRect(oldItem.object.x, oldItem.object.y, oldItem.object.width, oldItem.object.height);
+				resetOpticalFlowArea(auxRect);
+			}
+		}
+	}
+}
+
+//---------------------------------
+void ofApp::mouseDragged(int x, int y, int button) {
+	if (bFlowManualMouseSel) {
+		ofVec2f p2(x, y);
+		rect.set(p1, p2.x - p1.x, p2.y - p1.y);
+	}
+}
+
+//----------------------------------
+void ofApp::mousePressed(int x, int y, int button) {
+	if(bFlowManualMouseSel)p1.set(x, y);
+}
+
+//----------------------------------
+void ofApp::mouseReleased(int x, int y, int button) {
+	if (bFlowManualMouseSel) {
+		ofVec2f p2(x, y);
+		rect.set(p1, p2.x - p1.x, p2.y - p1.y);
+		resetOpticalFlowArea(rect);
+	}
+}
+
+//-----------------------------------
+void ofApp::resetOpticalFlowArea(ofRectangle _rect) {
+	
+	vector<KeyPoint> keypoints;
+	vector<KeyPoint> keypointsInside;
+	vector<cv::Point2f> featuresToTrack;
+	copyGray(cropedArea, grabberGray);
+	FAST(grabberGray, keypoints, 2);
+	for (int i = 0; i < keypoints.size(); i++) {
+		if (_rect.inside(toOf(keypoints[i].pt))) {
+			keypointsInside.push_back(keypoints[i]);
+		}
+	}
+	KeyPointsFilter::retainBest(keypointsInside, numKeypointsInside);
+	KeyPoint::convert(keypointsInside, featuresToTrack);
+	flow.setFeaturesToTrack(featuresToTrack);
+}
+
+//-------------------
+void ofApp::updateHardestBlobTracked() {
+	int oldestBlob = findOldestBlobId();
+	if (oldestBlob > -1) {
+		if (last_oldestBlob != oldestBlob) {
+			last_oldestBlob = oldestBlob;
+			//if (tracker.getCurrentRaw()[oldestBlob].getAge() > numMinFramesOldest) {
+				//Diferent, new and already oldest: perfect, set new Flow points area.
+				ofxCv::TrackedObject<cv::Rect> oldItem = tracker.getCurrentRaw()[oldestBlob];
+				ofRectangle auxRect(oldItem.object.x, oldItem.object.y, oldItem.object.width, oldItem.object.height);
+				resetOpticalFlowArea(auxRect);
+			//}
+		}
+		//equals
+		else {
+			if (tracker.getCurrentRaw()[oldestBlob].getAge() > numMinFramesOldest) {
+				cout << "Check when to update flow points again, may work look at that points if are our or still inside the image or dinamic detection area" << endl;
+			}
+		}
+	}
+}
+
+//-------------------
+//look for the older blob and track it with optical flow
+int ofApp::findOldestBlobId() {
+	int idOldest = -1;
+	int maxAge;
+	
+	for (int i = 0; i < tracker.getCurrentRaw().size(); i++) {
+		ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
+		if (cur.getAge() > maxAge) {
+			maxAge = cur.getAge();
+			idOldest = i;
+		}
+
+	}
+
+	return idOldest;
 }

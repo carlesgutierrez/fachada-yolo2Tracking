@@ -37,6 +37,32 @@ public:
 	ofxCv::RectTracker tracker;
 	std::vector<cv::Rect> boundingRects;
 
+
+	//////////////////////
+	//SocioGrama
+	ofParameter<bool> bSociograma;
+	ofParameter<ofColor> colorSociograma;
+	void drawSociogramaConnections();
+	void drawLineConnection(ofVec2f posBlobi, ofVec2f posBlobn, float gros);
+
+	////////////
+	//OpicalFlow
+	void draw_OldestItem_OpticalFlowFeatures();
+	ofParameter<bool> bOpticalFlow;
+	cv::Mat grabberGray;
+	ofxCv::FlowPyrLK flow;
+	ofVec2f p1;
+	ofRectangle rect;
+	void resetOpticalFlowArea(ofRectangle _rect);
+
+	void updateHardestBlobTracked();
+	int last_oldestBlob = -1;
+	ofParameter<int> numMinFramesOldest;
+	int findOldestBlobId();
+	ofParameter<int> numKeypointsInside;
+	ofParameter<ofColor> colorFeatureLines;
+	ofParameter<bool> bFlowManualMouseSel;
+
 	///////////////
 	//GUI
 	ofxPanel gui;
@@ -64,8 +90,13 @@ public:
 	ofParameter<float> trackerSmoothingRate;
 	float last_trackerSmoothingRate;
 
-	//
+	//mouse keyboard events
 	void keyPressed(int key);
+	void mouseDragged(int x, int y, int button);
+	void mousePressed(int x, int y, int button);
+	void mouseReleased(int x, int y, int button);
+
+
 
 	///////////////////////////////
 	//OSC filterd data
