@@ -16,6 +16,52 @@ ofxCv::RectTracker& ofApp::getTracker() {
 	return tracker;
 }
 
+//-----------------------------------------------------------
+void ofApp::setupGui() {
+
+	gui.setup();
+	// if a detected object overlaps >maxOverlap with another detected
+	// object with a higher confidence, it gets omitted
+	gui.add(bVideoPlayer.set("bVideoPlayer", false));
+	vector<ofVideoDevice> auxListDevices = videoGrabber.listDevices();
+	cout << "Num available VideoGrabber Devices =" << auxListDevices.size() << endl;
+	gui.add(idVideoGrabber.set("Device Id ", 0, 0, auxListDevices.size()));
+
+	gui.add(cropSizeX.set("CropX", 0.10, 0, 1));
+	gui.add(cropSizeY.set("CropY", 0.20, 0, 1));
+	gui.add(cropSizeW.set("CropW", 0.70, 0, 1));
+	gui.add(cropSizeH.set("CropH", 0.70, 0, 1));
+
+	//YOLO GUI DETECTIONS
+	gui.add(bDrawYoloInfo.set("Draw Yolo Info", false));
+	gui.add(detectionLabel.set("Filtered Label", "person"));
+	gui.add(percentPersonDetected.set("Probability", 0.25, 0.001, 1));
+	gui.add(maxOverlap.set("Max Overlap", 0.25, 0.01, 1));
+	//gui.add(maxRectAreaDetection.set("MaxRectAreaDetection", 140, 10, 300));
+
+	//TRACKER GUI options //TODO check how to detect changes values
+	gui.add(bDrawTracking.set("Draw Tracking", true));
+	gui.add(trackerPersistence.set("trackerPersistence", 200, 1, 50)); // milis time persistence blob tracked
+	gui.add(trackerMaximimDistance.set("trackerMaxDistance", 50, 1, 200)); // depends on the camera resolution	
+	gui.add(trackerSmoothingRate.set("trackerSmoothingRate", 0.3, 0.1, 1)); //
+
+																			//OpicalFlow GUi
+	gui.add(bFlowManualMouseSel.set("Manual Mouse Sel", false));
+	gui.add(numKeypointsInside.set("Flow keypointsInside Items", 10, 3, 30));
+	gui.add(bOpticalFlow.set("Draw bOpticalFlow", false));
+	gui.add(colorFeatureLines.set("Color lines", ofColor::indianRed));
+
+	//SocioGrama Gui
+	gui.add(bSociograma.set("Draw Sociograma", false));
+	gui.add(colorSociograma.set("Color Sociograma", ofColor::blueSteel));
+
+	//Osc Gui
+	gui.add(bSwapX.set("bSwapX", false));
+	gui.add(bSwapY.set("bSwapY", false));
+
+	gui.loadFromFile("settings.xml");
+}
+
 //------------------------------------------------------------
 void ofApp::setup() 
 {
@@ -30,49 +76,16 @@ void ofApp::setup()
 
 	///////////
 	//GUI
-	gui.setup();
-	// if a detected object overlaps >maxOverlap with another detected
-	// object with a higher confidence, it gets omitted
-	gui.add(bVideoPlayer.set("bVideoPlayer", false));
-	vector<ofVideoDevice> auxListDevices = videoGrabber.listDevices();
-	cout << "Num available VideoGrabber Devices =" << auxListDevices.size() << endl;
-	gui.add(idVideoGrabber.set("Device Id ", 0, 0, auxListDevices.size()));
-	gui.add(bSwapX.set("bSwapX", false));
-	gui.add(bSwapY.set("bSwapY", false));
+	setupGui();
 
-	gui.add(cropSizeX.set("CropX", 0.10, 0, 1));
-	gui.add(cropSizeY.set("CropY", 0.20, 0, 1));
-	gui.add(cropSizeW.set("CropW", 0.70, 0, 1));
-	gui.add(cropSizeH.set("CropH", 0.70, 0, 1));
-	
-	//YOLO GUI DETECTIONS
-	gui.add(bDrawYoloInfo.set("Draw Yolo Info", false));
-	gui.add(detectionLabel.set("Filtered Label", "person"));
-	gui.add(percentPersonDetected.set("Probability", 0.25, 0.001, 1));
-	gui.add(maxOverlap.set("Max Overlap", 0.25, 0.01, 1));
-	//gui.add(maxRectAreaDetection.set("MaxRectAreaDetection", 140, 10, 300));
-	
-	//TRACKER GUI options //TODO check how to detect changes values
-	last_trackerPersistence = 200;
-	gui.add(trackerPersistence.set("trackerPersistence", 200, 1, 50)); // milis time persistence blob tracked
-	
-	last_trackerMaximimDistance = 50;
-	gui.add(trackerMaximimDistance.set("trackerMaxDistance", 50, 1, 200)); // depends on the camera resolution
-	
-	last_trackerSmoothingRate = 0.3;
-	gui.add(trackerSmoothingRate.set("trackerSmoothingRate", 0.3, 0.1, 1)); //
-
-	//OpicalFlow GUi
-	gui.add(bFlowManualMouseSel.set("Manual Mouse Sel", false));
-	gui.add(numKeypointsInside.set("Flow keypointsInside Items", 10, 3, 30));
-	gui.add(bOpticalFlow.set("Draw bOpticalFlow", false));
-	gui.add(colorFeatureLines.set("Color lines", ofColor::indianRed));
-	
-	//SocioGrama
-	gui.add(bSociograma.set("Draw Sociograma", false));
-	gui.add(colorSociograma.set("Color Sociograma", ofColor::blueSteel));
-
-	gui.loadFromFile("settings.xml");
+	//Last Update Values Setup
+	last_trackerPersistence = trackerPersistence;
+	last_trackerSmoothingRate = trackerSmoothingRate;
+	last_trackerMaximimDistance = trackerMaximimDistance;
+	last_cropSizeX = cropSizeX;
+	last_cropSizeY = cropSizeY;
+	last_cropSizeW = cropSizeW;
+	last_cropSizeH = cropSizeH;
 
 
 	///////////////////
@@ -123,6 +136,18 @@ void ofApp::updateGuiParamters() {
 	if (last_trackerSmoothingRate != trackerSmoothingRate) {
 		tracker.setSmoothingRate(trackerSmoothingRate);
 		last_trackerSmoothingRate = trackerSmoothingRate;
+	}
+
+	//
+	if (last_cropSizeW != cropSizeW) {
+		last_cropSizeW = cropSizeW;
+		//Preventive reset. Works?
+		flow.resetFlow();
+	}
+	if (last_cropSizeH != cropSizeH) {
+		last_cropSizeH = cropSizeH;
+		//Preventive reset. Works?
+		flow.resetFlow();
 	}
 }
 
@@ -197,8 +222,12 @@ void ofApp::update()
 		//TEST
 		//Optical Flow Test with the first Bounding detected
 		if (bOpticalFlow) {
-			updateHardestBlobTracked();
-			flow.calcOpticalFlow(cropedArea);
+			int oldest_BlobId = updateHardestBlobTracked();
+			if(oldest_BlobId > -1)flow.calcOpticalFlow(cropedArea);
+			else {
+				flow.resetFlow();
+				cout << "flow.resetFlow();" << endl;
+			}
 		}
 
 
@@ -319,12 +348,14 @@ void ofApp::drawSociogramaConnections() {
 
 //----------------------------------------------------------
 void ofApp::draw_OldestItem_OpticalFlowFeatures() {
-	for (int i = 0; i < flow.getCurrent().size(); i++) {
-		ofPoint curI = flow.getCurrent()[i];
-		for (int j = 0; j < flow.getCurrent().size(); j++) {
-			ofPoint curJ = flow.getCurrent()[j];
-			drawLineConnection(ofVec2f(curI.x, curI.y), ofVec2f(curJ.x, curJ.y), 1);
-			// << "drawinlines curI.object.x = " << curJ.object.x << "curI.object.y = " << curJ.object.y << endl;
+	if (bOpticalFlow) {
+		for (int i = 0; i < flow.getCurrent().size(); i++) {
+			ofPoint curI = flow.getCurrent()[i];
+			for (int j = 0; j < flow.getCurrent().size(); j++) {
+				ofPoint curJ = flow.getCurrent()[j];
+				drawLineConnection(ofVec2f(curI.x, curI.y), ofVec2f(curJ.x, curJ.y), 1);
+				// << "drawinlines curI.object.x = " << curJ.object.x << "curI.object.y = " << curJ.object.y << endl;
+			}
 		}
 	}
 }
@@ -344,7 +375,7 @@ void ofApp::drawLineConnection(ofVec2f posBlobi, ofVec2f posBlobn, float gros)
 //----------------------------------------------------------
 void ofApp::drawTracking() {
 
-	if (true) { //Show Labels
+	if (bDrawTracking) { //Show Labels
 
 		for (int i = 0; i < boundingRects.size(); i++) {
 			ofPoint center = ofPoint(boundingRects[i].x + boundingRects[i].width*.5, boundingRects[i].y + boundingRects[i].height*.5);
@@ -377,6 +408,7 @@ void ofApp::keyPressed(int key) {
 
 	if (key == ' ') {
 		if (bOpticalFlow) {
+			//Manual method
 			int oldestId = findOldestBlobId();
 			if (oldestId > -1) {
 				ofxCv::TrackedObject<cv::Rect> oldItem = tracker.getCurrentRaw()[oldestId];
@@ -428,7 +460,7 @@ void ofApp::resetOpticalFlowArea(ofRectangle _rect) {
 }
 
 //-------------------
-void ofApp::updateHardestBlobTracked() {
+int ofApp::updateHardestBlobTracked() {
 	int oldestBlob = findOldestBlobId();
 	if (oldestBlob > -1) {
 		if (last_oldestBlob != oldestBlob) {
@@ -442,18 +474,20 @@ void ofApp::updateHardestBlobTracked() {
 		}
 		//equals
 		else {
-			if (tracker.getCurrentRaw()[oldestBlob].getAge() > numMinFramesOldest) {
-				cout << "Check when to update flow points again, may work look at that points if are our or still inside the image or dinamic detection area" << endl;
-			}
+			//if (tracker.getCurrentRaw()[oldestBlob].getAge() > numMinFramesOldest) {
+			//	cout << "Check when to update flow points again, may work look at that points if are our or still inside the image or dinamic detection area" << endl;
+			//}
 		}
 	}
+
+	return oldestBlob;
 }
 
 //-------------------
 //look for the older blob and track it with optical flow
 int ofApp::findOldestBlobId() {
 	int idOldest = -1;
-	int maxAge;
+	int maxAge = 0;
 	
 	for (int i = 0; i < tracker.getCurrentRaw().size(); i++) {
 		ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];

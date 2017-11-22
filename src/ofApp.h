@@ -25,17 +25,16 @@ public:
 	ofPixels cropedArea;
 	std::vector< detected_object > detections;
 
-	//Blob Tracking
-	vector<ofxCvBlob> blobsYolo;
-
 	/////////////////////////////////////
 	//Tracker	
 	void drawTracking();
 	cv::Vec2f getVelocity(unsigned int i) const;
 	unsigned int getLabel(unsigned int i) const;
 	ofxCv::RectTracker & getTracker();
+	void setupGui();
 	ofxCv::RectTracker tracker;
 	std::vector<cv::Rect> boundingRects;
+	ofParameter<bool> bDrawTracking;
 
 
 	//////////////////////
@@ -55,7 +54,7 @@ public:
 	ofRectangle rect;
 	void resetOpticalFlowArea(ofRectangle _rect);
 
-	void updateHardestBlobTracked();
+	int updateHardestBlobTracked();
 	int last_oldestBlob = -1;
 	ofParameter<int> numMinFramesOldest;
 	int findOldestBlobId();
@@ -67,10 +66,10 @@ public:
 	//GUI
 	ofxPanel gui;
 	//Croping camera
-	ofParameter<float> cropSizeX;
-	ofParameter<float> cropSizeY;
-	ofParameter<float> cropSizeW;
-	ofParameter<float> cropSizeH;
+	ofParameter<float> cropSizeX; float last_cropSizeX;
+	ofParameter<float> cropSizeY; float last_cropSizeY;
+	ofParameter<float> cropSizeW; float last_cropSizeW;
+	ofParameter<float> cropSizeH; float last_cropSizeH;
 	//yolo gui
 	ofParameter<string> detectionLabel;
 	ofParameter<float> maxRectAreaDetection;
