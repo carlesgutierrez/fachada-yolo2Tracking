@@ -14,7 +14,7 @@ Once all required addons are properly installed in your OF folder: ReGenerate th
      - ofxDarknet: (https://github.com/mrzl/ofxDarknet)
               There are some more necessary steps that don't work with the OF project generator
               Compile as Debug or Release in x64 mode
-              Within VS2015 Solution Explorer, rightclick on the generated project -> Build Dependencies -> Build Customizations -> Tick CUDA 8.0
+              Within VS2015 Solution Explorer, rightclick on the generated project -> Build Dependencies -> Build Customizations -> Tick CUDA 8.0 --> windows10 64 bits local exe installer --> https://developer.nvidia.com/cuda-80-ga2-download-archive
               Copy pthreadVC2.dll from ofxDarknet\libs\3rdparty\dll\x64 to your applications bin folder
 
      
