@@ -11,6 +11,7 @@ Has some other features like spout for sharing video capture in windows to other
 Once all required addons are properly installed in your OF folder: ReGenerate the project, and afollow instructions derived from external addons. Check following addons and comments.
 
  * Required addons: 
+     - ofxImGui: (https://github.com/jvcleave/ofxImGui)
      - ofxDarknet: (https://github.com/mrzl/ofxDarknet)
               There are some more necessary steps that don't work with the OF project generator
               Compile as Debug or Release in x64 mode
