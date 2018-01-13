@@ -1,6 +1,6 @@
 ofxCv
 ofxDarknet
-ofxGui
+ofxImGui
 ofxOpenCv
 ofxOsc
 ofxSpout2
