@@ -5,6 +5,7 @@
 #include "ofxDarknet.h"
 #include "ofxImGui.h"
 #include "ofxOsc.h"
+#include "trackerAnalizer.h"
 
 class ofxYolo4Games
 {
@@ -14,8 +15,11 @@ public:
 	void draw();
 
 	void resetVideoInterface();
+	bool updateAndCropVideoCapture();
 	void send_OSC_Data_AllInBlobs();
-	
+	void send_OSC_YoloData();
+
+	void drawFollowerAnalisys();
 
 	ofxDarknet darknet;
 
@@ -29,12 +33,14 @@ public:
 	/////////////////////////////////////
 	//Tracker	
 	void drawTracking();
-	cv::Vec2f getVelocity(unsigned int i) const;
-	unsigned int getLabel(unsigned int i) const;
-	ofxCv::RectTracker & getTracker();
+	//cv::Vec2f getVelocity(unsigned int i) const;
+	//unsigned int getLabel(unsigned int i) const;
+	
 	void setupGui();
 	void drawGui();
-	ofxCv::RectTracker tracker;
+	//ofxCv::RectTracker4Games * tracker;
+	//float smoothingRateHacked = 0.5;
+	ofxCv::RectTrackerFollower<trackerAnalizer> tracker;
 	std::vector<cv::Rect> boundingRects;
 	bool bDrawTracking = true;
 
@@ -56,7 +62,7 @@ public:
 	ofRectangle rect;
 	void resetOpticalFlowArea(ofRectangle _rect);
 
-	int updateHardestBlobTracked();
+	int getOldestBlobIdTracked();
 	int last_oldestBlob = -1;
 	int numMinFramesOldest;
 	int findOldestBlobId();
@@ -76,7 +82,7 @@ public:
 	//yolo gui
 	string detectionLabel;
 	float maxRectAreaDetection;
-	float percentPersonDetected = 0.25;
+	float minPercent4PersonDetected = 0.25;
 	float maxOverlap = 0.25;
 	bool bVideoPlayer = false;
 	int idVideoGrabber = 0;
@@ -87,7 +93,7 @@ public:
 	//tracker gui
 	int trackerPersistence = 50; float last_trackerPersistence;
 	int trackerMaximimDistance = 50; float last_trackerMaximimDistance;
-	float trackerSmoothingRate = 0.3; float last_trackerSmoothingRate;
+	float trackerSmoothingRate = 0.01; float last_trackerSmoothingRate;
 
 	//mouse keyboard events
 	void keyPressed(int key);

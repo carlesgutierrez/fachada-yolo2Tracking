@@ -3,18 +3,19 @@
 using namespace cv;
 using namespace ofxCv;
 
-//--------------------------------------------------------------
-cv::Vec2f ofxYolo4Games::getVelocity(unsigned int i) const {
-	return tracker.getVelocity(i);
-}
-
-unsigned int ofxYolo4Games::getLabel(unsigned int i) const {
-	return tracker.getCurrentLabels()[i];
-}
-
-ofxCv::RectTracker& ofxYolo4Games::getTracker() {
-	return tracker;
-}
+////External and personal uses of Tracker
+////--------------------------------------------------------------
+//cv::Vec2f ofxYolo4Games::getVelocity(unsigned int i) const {
+//	return tracker.getVelocity(i);
+//}
+//
+//unsigned int ofxYolo4Games::getLabel(unsigned int i) const {
+//	return tracker.getCurrentLabels()[i];
+//}
+//
+//ofxCv::RectTracker4Games* ofxYolo4Games::getTracker() {
+//	return tracker;
+//}
 
 //-----------------------------------------------------------
 void ofxYolo4Games::setupGui() {
@@ -69,7 +70,7 @@ void ofxYolo4Games::drawGui() {
 	//YOLO GUI DETECTIONS
 	ImGui::Checkbox("bDrawYoloInfo", &bDrawYoloInfo);
 	ImGui::Text("Filtered Label -> person");
-	ImGui::SliderFloat("Probability", &percentPersonDetected, 0.001, 1);
+	ImGui::SliderFloat("Probability", &minPercent4PersonDetected, 0.001, 1);
 	ImGui::SliderFloat("Max Overlap", &maxOverlap, 0.01, 1);
 	//gui.add(maxRectAreaDetection.set("MaxRectAreaDetection", 140, 10, 300));
 
@@ -82,8 +83,15 @@ void ofxYolo4Games::drawGui() {
 		tracker.setPersistence(trackerPersistence);
 	if(ImGui::SliderInt("trackerMaximimDistance", &trackerMaximimDistance, 1, 200))
 		tracker.setMaximumDistance(trackerMaximimDistance);
-	if(ImGui::SliderFloat("trackerSmoothingRate", &trackerSmoothingRate, 0.1, 1))
-		tracker.setSmoothingRate(trackerSmoothingRate);
+	//not working
+	//Values not saved finally...
+	//if (ImGui::SliderFloat("trackerSmoothingRate", &trackerSmoothingRate, 0.01, 1)) {
+	//	vector<trackerAnalizer> followers = tracker.getFollowers();
+	//	for (int i = 0; i < followers.size(); i++) {
+	//		followers[i].setSmoothingRate(trackerSmoothingRate);
+	//	}
+	//}
+	
 
 	ImGui::Checkbox("Draw Tracking", &bDrawTracking);
 
@@ -146,9 +154,9 @@ void ofxYolo4Games::setup()
 
 	///////////////////
 	//tracker Configuratio // TODO add Gui
+	cout << "setup trackerPersistence to " << trackerPersistence << endl;
 	tracker.setPersistence(trackerPersistence);
 	tracker.setMaximumDistance(trackerMaximimDistance);
-	tracker.setSmoothingRate(trackerSmoothingRate);
 
 	//////////////////
 	//OSC
@@ -182,11 +190,11 @@ void ofxYolo4Games::resetVideoInterface() {
 	}
 }
 
-//------------------------------------------
-void ofxYolo4Games::update()
-{	
+//-----------------------------------------------------------------
+bool ofxYolo4Games::updateAndCropVideoCapture() {
 
-	////////////////////////////////////////////////////////
+	bool bNewVideoFrame = false;
+	/////////////////////////////////////////////////
 	//ResetInterface if Video was not init & Update Internal VideoFrames
 	if (!bVideoPlayer) {
 		if (!videoGrabber.isInitialized())resetVideoInterface();
@@ -202,18 +210,22 @@ void ofxYolo4Games::update()
 
 	/////////////////////////////////////////////////
 	//Get Desired Pixels Video data
-
-	//YOLO2 detected objects with confidence < threshold are omitted
-	float thresh = percentPersonDetected;//ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, 1);
-	//float maxOverlap = 0.25; // setup at GUI
-
 	//CROP
 	if (bVideoPlayer)videoPlayer.getPixels().cropTo(cropedArea, videoPlayer.getWidth()*cropSizeX, videoPlayer.getHeight()*cropSizeY, videoPlayer.getWidth()*cropSizeW, videoPlayer.getHeight()*cropSizeH);
 	else videoGrabber.getPixels().cropTo(cropedArea, videoGrabber.getWidth()*cropSizeX, videoGrabber.getHeight()*cropSizeY, videoGrabber.getWidth()*cropSizeW, videoGrabber.getHeight()*cropSizeH);
 
-	
-	if (bVideoPlayer) bNewFrameToProcess = videoPlayer.isFrameNew();
-	else  bNewFrameToProcess = videoGrabber.isFrameNew();
+
+	if (bVideoPlayer) bNewVideoFrame = videoPlayer.isFrameNew();
+	else bNewVideoFrame = videoGrabber.isFrameNew();
+
+	return bNewVideoFrame;
+}
+
+//------------------------------------------
+void ofxYolo4Games::update()
+{	
+
+	bNewFrameToProcess = updateAndCropVideoCapture();
 
 	////////////////////////////////////////////////////
 	//Detection and Tracker
@@ -221,11 +233,12 @@ void ofxYolo4Games::update()
 	if (bNewFrameToProcess) {
 
 		detections.clear();
-		detections = darknet.yolo(cropedArea, thresh, maxOverlap);
+		//YOLO2 detected objects with confidence < threshold(%) are omitted
+		detections = darknet.yolo(cropedArea, minPercent4PersonDetected, maxOverlap);
 
 		boundingRects.clear();
 
-		//Pre clear
+		//Pre clear results with only desired labels
 		if (detections.size() > 0) {
 			
 			for (detected_object d : detections)
@@ -246,11 +259,12 @@ void ofxYolo4Games::update()
 
 		//Update tracker
 		tracker.track(boundingRects);
+		
 
 		//TEST
-		//Optical Flow Test with the first Bounding detected
+		//Update Optical Flow with the oldest item. //TODO check how to use this calculations.. then do all if it's good.
 		if (bOpticalFlow && flow  != nullptr) {
-			int oldest_BlobId = updateHardestBlobTracked();
+			int oldest_BlobId = getOldestBlobIdTracked();
 			if(oldest_BlobId > -1)flow->calcOpticalFlow(cropedArea);
 			else {
 				flow->resetFlow();
@@ -258,6 +272,7 @@ void ofxYolo4Games::update()
 			}
 		}
 
+	
 
 		//If Data Tracked then Send OSC
 		send_OSC_Data_AllInBlobs();
@@ -266,26 +281,128 @@ void ofxYolo4Games::update()
 
 //-----------------------------------------
 void ofxYolo4Games::send_OSC_Data_AllInBlobs() {
-	
-	int numTrackedObjects = tracker.getCurrentRaw().size();
-	//cout << "numTrackedObjects = " << numTrackedObjects << endl;
-	
+
+	vector<trackerAnalizer> followers = tracker.getFollowers();
+	int numTrackedObjects = followers.size();
 	//Start OSC package
 	ofxOscMessage m;
 	m.clear();
 	m.setAddress("/GameBlobAllIn");//TODO tracking Label
 	m.addIntArg(numTrackedObjects); //Add the number of Blobs detected in order to read them properly and easy
 
-	//Later tracker.getDeadLabels().size();
-	for (int i = 0; i < numTrackedObjects; i++) {
-		
-		ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
-		unsigned int auxSmoothLabel = cur.getLabel();
-		//Getting Smoothed Values Directly
+									//TODO Test with std::vector<F>& getFollowers()
+
+	for (int i = 0; i < followers.size(); i++) {
+
 		cv::Point2f centerBlobi;
 		cv::Rect smooth_cur;
-		smooth_cur = tracker.getSmoothed(auxSmoothLabel);
-		//centerBlobi = cv::Point2f(cur.object.x + cur.object.width*.5, cur.object.y + cur.object.height*.5);
+		smooth_cur = followers[i].smoothed;
+
+		centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
+
+		float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
+		float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
+
+																	//if swap values acive:
+		if (bSwapX)resumedPosX = 1 - resumedPosX;
+		if (bSwapY)resumedPosY = 1 - resumedPosY;
+
+		m.addFloatArg(resumedPosX);
+		m.addFloatArg(resumedPosY);
+
+		//Size W H 
+		m.addFloatArg(smooth_cur.width);
+		m.addFloatArg(smooth_cur.height);
+
+		//Adde info to the message
+		//for Tracking add int ID & int TIME
+		int idAux = followers[i].getLabel();
+		m.addIntArg(idAux); //Sending ID Label
+		int timeAux = followers[i].getAge();
+		m.addIntArg(timeAux); //Sending Time Tracked
+
+		//This must be done using FollowerTracker class
+		//if (detections.size() > i) {
+		//	float auxProb = detections[i].probability;
+		//	m.addFloatArg(auxProb);
+	}
+
+	sender.sendMessage(m, false);
+
+
+	//OLD
+	//int numTrackedObjects = tracker.getCurrentRaw().size(); //TODO get this other way. CurrentLabels + DeadLabels
+	////cout << "numTrackedObjects = " << numTrackedObjects << endl;
+
+	////Start OSC package
+	//ofxOscMessage m;
+	//m.clear();
+	//m.setAddress("/GameBlobAllIn");//TODO tracking Label
+	//m.addIntArg(numTrackedObjects); //Add the number of Blobs detected in order to read them properly and easy
+
+	////TODO Test with std::vector<F>& getFollowers()
+	//for (int i = 0; i < numTrackedObjects; i++) {
+	//	
+	//	ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
+	//	unsigned int auxSmoothLabel = cur.getLabel();
+	//	//Getting Smoothed Values Directly
+	//	cv::Point2f centerBlobi;
+	//	cv::Rect smooth_cur;
+	//	smooth_cur = cur.object;// tracker.getSmoothed(auxSmoothLabel);
+	//	//centerBlobi = cv::Point2f(cur.object.x + cur.object.width*.5, cur.object.y + cur.object.height*.5);
+	//	centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
+
+	//	float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
+	//	float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
+
+	//	//if swap values acive:
+	//	if (bSwapX)resumedPosX = 1 - resumedPosX;
+	//	if (bSwapY)resumedPosY = 1 - resumedPosY;
+
+	//	m.addFloatArg(resumedPosX);
+	//	m.addFloatArg(resumedPosY);
+
+	//	//Size W H 
+	//	m.addFloatArg(cur.object.width);
+	//	m.addFloatArg(cur.object.height);
+
+	//	//Adde info to the message
+	//	//for Tracking add int ID & int TIME
+	//	int idAux = cur.getLabel();
+	//	m.addIntArg(idAux); //Sending ID Label
+	//	int timeAux = cur.getAge();
+	//	m.addIntArg(timeAux); //Sending Time Tracked
+
+	//	//This must be done using FollowerTracker class
+	//	//if (detections.size() > i) {
+	//	//	float auxProb = detections[i].probability;
+	//	//	m.addFloatArg(auxProb);
+	//	//}
+	//}
+
+	//sender.sendMessage(m, false);
+
+}
+
+//-----------------------------------------
+void ofxYolo4Games::send_OSC_YoloData() {
+
+	vector<trackerAnalizer> followers = tracker.getFollowers();
+	//int numTrackedObjects = tracker.getCurrentRaw().size(); //TODO get this other way. CurrentLabels + DeadLabels
+	int numTrackedObjects = followers.size();
+	//Start OSC package
+	ofxOscMessage m;
+	m.clear();
+	m.setAddress("/GameBlobYoloData");//TODO tracking Label
+	m.addIntArg(numTrackedObjects); //Add the number of Blobs detected in order to read them properly and easy
+
+									//TODO Test with std::vector<F>& getFollowers()
+
+	for (int i = 0; i < followers.size(); i++) {
+		cv::Point2f centerBlobi;
+		cv::Rect smooth_cur;
+		smooth_cur = followers[i].smoothed;
+				
 		centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
 
 		float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
@@ -299,25 +416,78 @@ void ofxYolo4Games::send_OSC_Data_AllInBlobs() {
 		m.addFloatArg(resumedPosY);
 
 		//Size W H 
-		m.addFloatArg(cur.object.width);
-		m.addFloatArg(cur.object.height);
+		m.addFloatArg(smooth_cur.width);
+		m.addFloatArg(smooth_cur.height);
 
 		//Adde info to the message
 		//for Tracking add int ID & int TIME
-		int idAux = cur.getLabel();
+		int idAux = followers[i].getLabel();
 		m.addIntArg(idAux); //Sending ID Label
-		int timeAux = cur.getAge();
+		int timeAux = followers[i].getAge();
 		m.addIntArg(timeAux); //Sending Time Tracked
 
 		//This must be done using FollowerTracker class
 		//if (detections.size() > i) {
 		//	float auxProb = detections[i].probability;
 		//	m.addFloatArg(auxProb);
-		//}
 	}
 
 	sender.sendMessage(m, false);
 
+	//oLD
+
+	//for (int i = 0; i < numTrackedObjects; i++) {
+
+	//	ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
+	//	unsigned int auxSmoothLabel = cur.getLabel();
+	//	//Getting Smoothed Values Directly
+	//	cv::Point2f centerBlobi;
+	//	cv::Rect smooth_cur;
+	//	smooth_cur = cur.object;// tracker.getSmoothed(auxSmoothLabel);
+	//	
+	//	centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
+
+	//	float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
+	//	float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
+
+	//	//if swap values acive:
+	//	if (bSwapX)resumedPosX = 1 - resumedPosX;
+	//	if (bSwapY)resumedPosY = 1 - resumedPosY;
+
+	//	m.addFloatArg(resumedPosX);
+	//	m.addFloatArg(resumedPosY);
+
+	//	//Size W H 
+	//	m.addFloatArg(cur.object.width);
+	//	m.addFloatArg(cur.object.height);
+
+	//	//Adde info to the message
+	//	//for Tracking add int ID & int TIME
+	//	int idAux = cur.getLabel();
+	//	m.addIntArg(idAux); //Sending ID Label
+	//	int timeAux = cur.getAge();
+	//	m.addIntArg(timeAux); //Sending Time Tracked
+
+	//						  //This must be done using FollowerTracker class
+	//						  //if (detections.size() > i) {
+	//						  //	float auxProb = detections[i].probability;
+	//						  //	m.addFloatArg(auxProb);
+	//						  //}
+	//}
+
+	//sender.sendMessage(m, false);
+
+}
+
+//----------------------------------------------------------
+void ofxYolo4Games::drawFollowerAnalisys() {
+
+	vector<trackerAnalizer> followers = tracker.getFollowers();
+	for (int i = 0; i < followers.size(); i++) {
+		//if(!followers[i].bLost)
+		followers[i].draw();
+		int temp_label = followers[i].getLabel();
+	}
 }
 
 //----------------------------------------------------------
@@ -341,6 +511,8 @@ void ofxYolo4Games::draw()
 	}
 	//Draw Tracker results
 	drawTracking();
+	drawFollowerAnalisys();
+
 
 	ofEnableAlphaBlending();
 	if (bSociograma) {
@@ -371,12 +543,13 @@ void ofxYolo4Games::draw()
 }
 //----------------------------------------------------------
 void ofxYolo4Games::drawSociogramaConnections() {
-	for (int i = 0; i < tracker.getCurrentRaw().size(); i++) {
-		ofxCv::TrackedObject<cv::Rect> curI = tracker.getCurrentRaw()[i];
-		for (int j = 0; j < tracker.getCurrentRaw().size(); j++) {
-			ofxCv::TrackedObject<cv::Rect> curJ = tracker.getCurrentRaw()[j];
-			drawLineConnection(ofVec2f(curI.object.x, curI.object.y), ofVec2f(curJ.object.x, curJ.object.y), 1);
-			// << "drawinlines curI.object.x = " << curJ.object.x << "curI.object.y = " << curJ.object.y << endl;
+
+	vector<trackerAnalizer> followers = tracker.getFollowers();
+	for (int i = 0; i < followers.size(); i++) {
+		cv::Rect smooth_curI = followers[i].smoothed;
+		for (int j = 0; j < followers.size(); j++) {
+			cv::Rect smooth_curJ = followers[j].smoothed;
+			drawLineConnection(ofVec2f(smooth_curI.x, smooth_curI.y), ofVec2f(smooth_curJ.x, smooth_curJ.y), 1);
 		}
 	}
 }
@@ -412,39 +585,17 @@ void ofxYolo4Games::drawTracking() {
 
 	if (bDrawTracking) { //Show Labels
 
-		//for (int i = 0; i < boundingRects.size(); i++) {
-		//	ofPoint center = ofPoint(boundingRects[i].x + boundingRects[i].width*.5, boundingRects[i].y + boundingRects[i].height*.5);
-		//	ofPushMatrix();
-		//	ofPushStyle();
-		//	ofSetColor(ofColor::red);
-		//	ofDrawRectangle(ofxCv::toOf(boundingRects[i]));
-		//	ofTranslate(center.x, center.y);
-		//	int label = tracker.getCurrentLabels()[i];
-		//	string msg = ofToString(label) + ":" + ofToString(tracker.getAge(label));
-		//	ofDrawBitmapString(msg, 0, 0);
-		//	ofVec2f velocity = ofxCv::toOf(tracker.getVelocity(i));
-		//	ofDrawLine(0, 0, velocity.x, velocity.y);
-		//	ofPopStyle();
-		//	ofPopMatrix();
-
-		//}
-
-		//Later tracker.getDeadLabels().size();
-		for (int i = 0; i < tracker.getCurrentRaw().size(); i++) {
-
-			ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
-			unsigned int auxSmoothLabel = cur.getLabel();
-			//Getting Smoothed Values Directly
+		vector<trackerAnalizer> followers = tracker.getFollowers();
+		for (int i = 0; i < followers.size(); i++) {
 			cv::Point2f centerBlobi;
-			cv::Rect smooth_cur;
-			smooth_cur = tracker.getSmoothed(auxSmoothLabel);
-			//centerBlobi = cv::Point2f(cur.object.x + cur.object.width*.5, cur.object.y + cur.object.height*.5);
+			cv::Rect smooth_cur = followers[i].smoothed;
+
 			centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
 
 			float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
 			float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
 
-			//if swap values acive:
+																		//if swap values acive:
 			if (bSwapX)resumedPosX = 1 - resumedPosX;
 			if (bSwapY)resumedPosY = 1 - resumedPosY;
 
@@ -453,13 +604,17 @@ void ofxYolo4Games::drawTracking() {
 
 			//Draw Smoothed rectangle detected
 			ofSetColor(ofColor::hotPink);
-			ofDrawRectangle(ofxCv::toOf(smooth_cur));
+			ofRectangle auxPlayerArea = ofxCv::toOf(smooth_cur);
+			ofDrawRectangle(auxPlayerArea);
+
+			ofSetColor(ofColor::white);
+			int label = followers[i].getLabel();
+			string msg = ofToString(label) + ":" + ofToString(tracker.getAge(label));
+			ofDrawBitmapString(msg, auxPlayerArea.getBottomLeft().x, auxPlayerArea.getBottomLeft().y);
 
 			ofPopStyle();
 			ofPopMatrix();
 		}
-
-
 	}
 }
 
@@ -477,8 +632,8 @@ void ofxYolo4Games::keyPressed(int key) {
 			//Manual method
 			int oldestId = findOldestBlobId();
 			if (oldestId > -1) {
-				ofxCv::TrackedObject<cv::Rect> oldItem = tracker.getCurrentRaw()[oldestId];
-				ofRectangle auxRect(oldItem.object.x, oldItem.object.y, oldItem.object.width, oldItem.object.height);
+				trackerAnalizer oldItem = tracker.getFollowers()[oldestId];
+				ofRectangle auxRect(oldItem.smoothed.x, oldItem.smoothed.y, oldItem.smoothed.width, oldItem.smoothed.height);
 				resetOpticalFlowArea(auxRect);
 			}
 		}
@@ -529,15 +684,17 @@ void ofxYolo4Games::resetOpticalFlowArea(ofRectangle _rect) {
 }
 
 //-------------------
-int ofxYolo4Games::updateHardestBlobTracked() {
+int ofxYolo4Games::getOldestBlobIdTracked() {
 	int oldestBlob = findOldestBlobId();
 	if (oldestBlob > -1) {
 		if (last_oldestBlob != oldestBlob) {
 			last_oldestBlob = oldestBlob;
 			//if (tracker.getCurrentRaw()[oldestBlob].getAge() > numMinFramesOldest) {
 				//Diferent, new and already oldest: perfect, set new Flow points area.
-				ofxCv::TrackedObject<cv::Rect> oldItem = tracker.getCurrentRaw()[oldestBlob];
-				ofRectangle auxRect(oldItem.object.x, oldItem.object.y, oldItem.object.width, oldItem.object.height);
+
+				//ofxCv::TrackedObject<cv::Rect> oldItem = tracker.getCurrentRaw()[oldestBlob];
+				trackerAnalizer oldItem = tracker.getFollowers()[oldestBlob];
+				ofRectangle auxRect(oldItem.smoothed.x, oldItem.smoothed.y, oldItem.smoothed.width, oldItem.smoothed.height);
 				resetOpticalFlowArea(auxRect);
 			//}
 		}
@@ -558,8 +715,9 @@ int ofxYolo4Games::findOldestBlobId() {
 	int idOldest = -1;
 	int maxAge = 0;
 	
-	for (int i = 0; i < tracker.getCurrentRaw().size(); i++) {
-		ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
+	for (int i = 0; i < tracker.getFollowers().size(); i++) {
+		//ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
+		trackerAnalizer cur = tracker.getFollowers()[i];
 		if (cur.getAge() > maxAge) {
 			maxAge = cur.getAge();
 			idOldest = i;
