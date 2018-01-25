@@ -33,6 +33,11 @@ void ofxYolo4Games::drawGui() {
 	//required to call this at end
 	gui.begin();
 	ImGui::PushItemWidth(100);
+
+#if defined(USE_SHARECAM_SPOUT)
+	ImGui::Checkbox("SPOUT the Camera", &bSpoutCameraActive);
+#endif
+
 	ImGui::Checkbox("bVideoPlayer", &bVideoPlayer);
 	if (!bVideoPlayer) {
 		ImGui::SameLine();
@@ -83,6 +88,7 @@ void ofxYolo4Games::drawGui() {
 		tracker.setPersistence(trackerPersistence);
 	if(ImGui::SliderInt("trackerMaximimDistance", &trackerMaximimDistance, 1, 200))
 		tracker.setMaximumDistance(trackerMaximimDistance);
+
 	//not working
 	//Values not saved finally...
 	//if (ImGui::SliderFloat("trackerSmoothingRate", &trackerSmoothingRate, 0.01, 1)) {
@@ -92,8 +98,8 @@ void ofxYolo4Games::drawGui() {
 	//	}
 	//}
 	
-
-	ImGui::Checkbox("Draw Tracking", &bDrawTracking);
+	ImGui::Checkbox("Send OSC GameBlobAllIn", &bSendAllBlobsIn);
+	ImGui::Checkbox("Send OSC GameBlobYoloData", &bSendYoloDataTracking);
 
 	ImGui::PopItemWidth();
 
@@ -272,10 +278,15 @@ void ofxYolo4Games::update()
 			}
 		}
 
-	
-
 		//If Data Tracked then Send OSC
-		send_OSC_Data_AllInBlobs();
+		if(bSendAllBlobsIn)send_OSC_Data_AllInBlobs();
+
+		if (bSendYoloDataTracking)send_OSC_YoloData();
+
+		//Spout
+#if defined(USE_SHARECAM_SPOUT)
+		if (bSpoutCameraActive)senderSpout.sendTexture(ofImage(cropedArea).getTexture(), "Camera");
+#endif
 	}
 }
 
@@ -320,67 +331,9 @@ void ofxYolo4Games::send_OSC_Data_AllInBlobs() {
 		m.addIntArg(idAux); //Sending ID Label
 		int timeAux = followers[i].getAge();
 		m.addIntArg(timeAux); //Sending Time Tracked
-
-		//This must be done using FollowerTracker class
-		//if (detections.size() > i) {
-		//	float auxProb = detections[i].probability;
-		//	m.addFloatArg(auxProb);
 	}
 
 	sender.sendMessage(m, false);
-
-
-	//OLD
-	//int numTrackedObjects = tracker.getCurrentRaw().size(); //TODO get this other way. CurrentLabels + DeadLabels
-	////cout << "numTrackedObjects = " << numTrackedObjects << endl;
-
-	////Start OSC package
-	//ofxOscMessage m;
-	//m.clear();
-	//m.setAddress("/GameBlobAllIn");//TODO tracking Label
-	//m.addIntArg(numTrackedObjects); //Add the number of Blobs detected in order to read them properly and easy
-
-	////TODO Test with std::vector<F>& getFollowers()
-	//for (int i = 0; i < numTrackedObjects; i++) {
-	//	
-	//	ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
-	//	unsigned int auxSmoothLabel = cur.getLabel();
-	//	//Getting Smoothed Values Directly
-	//	cv::Point2f centerBlobi;
-	//	cv::Rect smooth_cur;
-	//	smooth_cur = cur.object;// tracker.getSmoothed(auxSmoothLabel);
-	//	//centerBlobi = cv::Point2f(cur.object.x + cur.object.width*.5, cur.object.y + cur.object.height*.5);
-	//	centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
-
-	//	float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
-	//	float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
-
-	//	//if swap values acive:
-	//	if (bSwapX)resumedPosX = 1 - resumedPosX;
-	//	if (bSwapY)resumedPosY = 1 - resumedPosY;
-
-	//	m.addFloatArg(resumedPosX);
-	//	m.addFloatArg(resumedPosY);
-
-	//	//Size W H 
-	//	m.addFloatArg(cur.object.width);
-	//	m.addFloatArg(cur.object.height);
-
-	//	//Adde info to the message
-	//	//for Tracking add int ID & int TIME
-	//	int idAux = cur.getLabel();
-	//	m.addIntArg(idAux); //Sending ID Label
-	//	int timeAux = cur.getAge();
-	//	m.addIntArg(timeAux); //Sending Time Tracked
-
-	//	//This must be done using FollowerTracker class
-	//	//if (detections.size() > i) {
-	//	//	float auxProb = detections[i].probability;
-	//	//	m.addFloatArg(auxProb);
-	//	//}
-	//}
-
-	//sender.sendMessage(m, false);
 
 }
 

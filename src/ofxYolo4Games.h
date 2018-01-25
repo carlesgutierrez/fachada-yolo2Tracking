@@ -7,6 +7,14 @@
 #include "ofxOsc.h"
 #include "trackerAnalizer.h"
 
+
+//Uncomment this to Use it
+#define USE_SHARECAM_SPOUT
+
+#if defined(USE_SHARECAM_SPOUT)//and (TARGET_WIN32)
+#include "ofxSpout2Sender.h"
+#endif
+
 class ofxYolo4Games
 {
 public:
@@ -104,9 +112,17 @@ public:
 	///////////////////////////////
 	//OSC filterd data
 	ofxOscSender sender;
+	bool bSendAllBlobsIn = false;
+	bool bSendYoloDataTracking = true;
 
 	//OSC CONFIG
 	bool bResetHostIp = false;
 	int PORT = 12345;
 	string HOST = "127.0.0.1";//MLP: "192.168.2.254"; //192.168.1.158
+
+#if defined(USE_SHARECAM_SPOUT)//AND (TARGET_WIN32)
+	bool bSpoutCameraActive = false;
+	ofxSpout2::Sender senderSpout;
+#endif
+
 };
