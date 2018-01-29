@@ -9,7 +9,7 @@ Description
 App yolo2 to detect persons and track them in real time.
 Results are send by OSC protocol. 
 Yolo2 uses GPU with Cuda8/9.
-This is an fast written example of how to use Yolo2 ( ofxDarnet ) plus tracker from ofxCv. 
+This is an fast written example of how to use Yolo2 ( ofxDarknet ) plus tracker from ofxCv. 
 Has some other features like spout for sharing video capture in windows to other compatible softwares.  
 
 ## For installation:
