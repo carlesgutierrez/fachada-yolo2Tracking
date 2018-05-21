@@ -9,7 +9,7 @@ Description
 App yolo2 to detect persons and track them in real time.
 Results are send by OSC protocol. 
 Yolo2 uses GPU with Cuda8/9.
-This is an fast written example of how to use Yolo2 ( ofxDarnet ) plus tracker from ofxCv. 
+This is an fast written example of how to use Yolo2 ( ofxDarknet ) plus tracker from ofxCv. 
 Has some other features like spout for sharing video capture in windows to other compatible softwares.  
 
 ## For installation:
@@ -27,19 +27,7 @@ Once all required addons are properly installed in your OF folder: ReGenerate th
      
      - ofxCv: (https://github.com/kylemcdonald/ofxCv/tree/stable)
                - stable version and reset this propertie: c++ -> output files --> Object File name --> $(IntDir)/%(RelativeDir)/
-               # require small hack: add this func as public:
-              
-               ```
-               //Header Tracker.h
-               vector<TrackedObject<T> > getCurrentRaw();
 
-               //Source Tracker.cpp
-               template<class T>
-               inline vector<TrackedObject<T>> Tracker<T>::getCurrentRaw()
-               {
-                    return current;
-               }
-               ```
     - ofxSpout2 (https://github.com/Kj1/ofxSpout2) //Only for windows. Comment include headear if you do not wish this feature // TODO try trhis fork (https://github.com/sheridanis/ofxSpout2), that fix     potencial crash
 
      - ofxOpenCv (internal OF)
