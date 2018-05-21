@@ -235,6 +235,7 @@
     <ClCompile Include="..\..\..\addons\ofxSpout2\libs\src\SpoutSenderNames.cpp" />
     <ClCompile Include="..\..\..\addons\ofxSpout2\libs\src\SpoutSharedMemory.cpp" />
     <ClCompile Include="src\ofxYolo4Games.cpp" />
+    <ClCompile Include="src\variablesGui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ofApp.h" />
@@ -526,6 +527,7 @@
     <ClInclude Include="..\..\..\addons\ofxSpout2\libs\include\SpoutSharedMemory.h" />
     <ClInclude Include="src\ofxYolo4Games.h" />
     <ClInclude Include="src\trackerAnalizer.h" />
+    <ClInclude Include="src\variablesGui.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="$(OF_ROOT)\libs\openFrameworksCompiled\project\vs\openframeworksLib.vcxproj">

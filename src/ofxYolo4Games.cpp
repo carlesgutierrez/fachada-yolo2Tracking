@@ -86,9 +86,15 @@ void ofxYolo4Games::drawGui() {
 	//TODO Follow Here!
 	if (ImGui::SliderInt("trackerPersistence", &trackerPersistence, 1, 50))
 		tracker.setPersistence(trackerPersistence);
-	if(ImGui::SliderInt("trackerMaximimDistance", &trackerMaximimDistance, 1, 200))
+	if(ImGui::SliderInt("trackerMaximimDistance", &trackerMaximimDistance, 1, 400))
 		tracker.setMaximumDistance(trackerMaximimDistance);
 
+	ImGui::SliderFloat("Dir X Thresh -> ", &variablesGui::getInstance()->directionXTrheshold, 0, 10);
+	ImGui::SameLine();
+	if (variablesGui::getInstance()->directionX > variablesGui::getInstance()->directionXTrheshold) {
+		ImGui::TextColored(ImColor(0, 255, 0), ofToString(variablesGui::getInstance()->directionX, 0).c_str());
+	}else 	ImGui::TextColored(ImColor(100, 100, 100), ofToString(variablesGui::getInstance()->directionX, 0).c_str());
+	
 	//not working
 	//Values not saved finally...
 	//if (ImGui::SliderFloat("trackerSmoothingRate", &trackerSmoothingRate, 0.01, 1)) {
@@ -227,6 +233,7 @@ bool ofxYolo4Games::updateAndCropVideoCapture() {
 	return bNewVideoFrame;
 }
 
+
 //------------------------------------------
 void ofxYolo4Games::update()
 {	
@@ -257,15 +264,17 @@ void ofxYolo4Games::update()
 				//BlobYolo Tracking
 				//extrack, udpate and track bounding boxes
 				//filter only person labels
-				if (d.label == "person")
+				if (d.label == "person") {
+					//trackerAnalizer analizer(d.label, d.probability, 0.5);
 					boundingRects.push_back(ofxCv::toCv(d.rect));
+				}
+					
 			}
 
 		}
 
 		//Update tracker
-		tracker.track(boundingRects);
-		
+		tracker.track(boundingRects); //TODO Find how to pass other kind of variable with more info about detections
 
 		//TEST
 		//Update Optical Flow with the oldest item. //TODO check how to use this calculations.. then do all if it's good.
@@ -346,7 +355,7 @@ void ofxYolo4Games::send_OSC_YoloData() {
 	//Start OSC package
 	ofxOscMessage m;
 	m.clear();
-	m.setAddress("/GameBlobYoloData");//TODO tracking Label
+	m.setAddress("/BlobsTrackedYoloData");
 	m.addIntArg(numTrackedObjects); //Add the number of Blobs detected in order to read them properly and easy
 
 									//TODO Test with std::vector<F>& getFollowers()
@@ -354,12 +363,15 @@ void ofxYolo4Games::send_OSC_YoloData() {
 	for (int i = 0; i < followers.size(); i++) {
 		cv::Point2f centerBlobi;
 		cv::Rect smooth_cur;
+		cv::Rect currentRect;
+	
 		smooth_cur = followers[i].smoothed;
+		currentRect = followers[i].current;
 				
 		centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
 
-		float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
-		float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
+		float resumedPosX = (float)smooth_cur.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea  //centerBlobi.x
+		float resumedPosY = (float)smooth_cur.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea  //centerBlobi.y
 
 		//if swap values acive:
 		if (bSwapX)resumedPosX = 1 - resumedPosX;
@@ -379,57 +391,17 @@ void ofxYolo4Games::send_OSC_YoloData() {
 		int timeAux = followers[i].getAge();
 		m.addIntArg(timeAux); //Sending Time Tracked
 
-		//This must be done using FollowerTracker class
-		//if (detections.size() > i) {
-		//	float auxProb = detections[i].probability;
-		//	m.addFloatArg(auxProb);
+		//Actions trackerAnalizer Width
+		m.addIntArg(followers[i].statusActionW); //Sending ID Label
+		m.addIntArg(followers[i].statusActionH); //Sending Time Tracked
+
+		//TODO. Find correlated detections to tracked object. 
+		//Not possible searching in detections. If detection is lost but tracker memorized, will not find it.
+		//This variable need to be added at tracker. --> Do the own trackerFollower class with calcDistance personalized (equal as the other one)
+
 	}
 
 	sender.sendMessage(m, false);
-
-	//oLD
-
-	//for (int i = 0; i < numTrackedObjects; i++) {
-
-	//	ofxCv::TrackedObject<cv::Rect> cur = tracker.getCurrentRaw()[i];
-	//	unsigned int auxSmoothLabel = cur.getLabel();
-	//	//Getting Smoothed Values Directly
-	//	cv::Point2f centerBlobi;
-	//	cv::Rect smooth_cur;
-	//	smooth_cur = cur.object;// tracker.getSmoothed(auxSmoothLabel);
-	//	
-	//	centerBlobi = cv::Point2f(smooth_cur.x + smooth_cur.width*.5, smooth_cur.y + smooth_cur.height*.5);
-
-	//	float resumedPosX = centerBlobi.x / cropedArea.getWidth(); //Forced to 0..1 inside the RectArea 
-	//	float resumedPosY = centerBlobi.y / cropedArea.getHeight(); //Forced to 0..1 inside the RectArea 
-
-	//	//if swap values acive:
-	//	if (bSwapX)resumedPosX = 1 - resumedPosX;
-	//	if (bSwapY)resumedPosY = 1 - resumedPosY;
-
-	//	m.addFloatArg(resumedPosX);
-	//	m.addFloatArg(resumedPosY);
-
-	//	//Size W H 
-	//	m.addFloatArg(cur.object.width);
-	//	m.addFloatArg(cur.object.height);
-
-	//	//Adde info to the message
-	//	//for Tracking add int ID & int TIME
-	//	int idAux = cur.getLabel();
-	//	m.addIntArg(idAux); //Sending ID Label
-	//	int timeAux = cur.getAge();
-	//	m.addIntArg(timeAux); //Sending Time Tracked
-
-	//						  //This must be done using FollowerTracker class
-	//						  //if (detections.size() > i) {
-	//						  //	float auxProb = detections[i].probability;
-	//						  //	m.addFloatArg(auxProb);
-	//						  //}
-	//}
-
-	//sender.sendMessage(m, false);
-
 }
 
 //----------------------------------------------------------

@@ -24,6 +24,7 @@ public:
 
 	void resetVideoInterface();
 	bool updateAndCropVideoCapture();
+
 	void send_OSC_Data_AllInBlobs();
 	void send_OSC_YoloData();
 
@@ -37,6 +38,7 @@ public:
 	bool bNewFrameToProcess = false;
 	ofPixels cropedArea;
 	std::vector< detected_object > detections;
+	std::vector< detected_object > trackedDetections;
 
 	/////////////////////////////////////
 	//Tracker	
@@ -50,6 +52,7 @@ public:
 	//float smoothingRateHacked = 0.5;
 	ofxCv::RectTrackerFollower<trackerAnalizer> tracker;
 	std::vector<cv::Rect> boundingRects;
+	//TODO //std::vector<cv::TrackedYoloObjects> trackedObjects;
 	bool bDrawTracking = true;
 
 
@@ -83,10 +86,10 @@ public:
 	ofxImGui::Gui gui;
 	vector<ofVideoDevice> auxListDevices;
 	//Croping camera
-	float cropSizeX = 0.10; float last_cropSizeX;
-	float cropSizeY = 0.20; float last_cropSizeY;
-	float cropSizeW = 0.60; float last_cropSizeW;
-	float cropSizeH = 0.70; float last_cropSizeH;
+	float cropSizeX = 0; float last_cropSizeX;
+	float cropSizeY = 0; float last_cropSizeY;
+	float cropSizeW = 1; float last_cropSizeW;
+	float cropSizeH = 1; float last_cropSizeH;
 	//yolo gui
 	string detectionLabel;
 	float maxRectAreaDetection;
@@ -95,12 +98,12 @@ public:
 	bool bVideoPlayer = false;
 	int idVideoGrabber = 0;
 
-	bool bSwapX = true;
+	bool bSwapX = false;
 	bool bSwapY = false;
 	bool bDrawYoloInfo;
 	//tracker gui
-	int trackerPersistence = 50; float last_trackerPersistence;
-	int trackerMaximimDistance = 50; float last_trackerMaximimDistance;
+	int trackerPersistence = 10; float last_trackerPersistence;
+	int trackerMaximimDistance = 200; float last_trackerMaximimDistance;
 	float trackerSmoothingRate = 0.01; float last_trackerSmoothingRate;
 
 	//mouse keyboard events
@@ -118,7 +121,7 @@ public:
 	//OSC CONFIG
 	bool bResetHostIp = false;
 	int PORT = 12345;
-	string HOST = "127.0.0.1";//MLP: "192.168.2.254"; //192.168.1.158
+	string HOST = "localhost";//MLP: "192.168.2.254"; //192.168.1.158
 
 #if defined(USE_SHARECAM_SPOUT)//AND (TARGET_WIN32)
 	bool bSpoutCameraActive = false;
@@ -126,3 +129,4 @@ public:
 #endif
 
 };
+
