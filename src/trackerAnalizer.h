@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ofMain.h"
-#include "statsRecorder.h"
 #include "ofxCv.h"
 #include "variablesGui.h"
 

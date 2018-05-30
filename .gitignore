@@ -1,26 +1,44 @@
-[Bb]uild/
-[Oo]bj/
+###########################
+# ignore generated binaries
+# but not the data folder
+###########################
+
+[Bb]in/*  
+![Bb]in/data/
+
+##########
+# Data specifics
+##########
+*.weights
+*.mov
+!1.mov
+*.dll
+[Bb]in/*.exe
+
+#########
+# Specific Files and Folders
+#########
+*.VC.db
+
+#########
+# general
+#########
+
+*/[Bb]uild/
+*/[Oo]bj/
 *.o
-**/[Dd]ebug*/
-**/[Rr]elease*/
-**/gcc-debug/
-**/gcc-release/
+*/[Dd]ebug*/
+*/[Rr]elease*/
 *.mode*
 *.app/
 *.pyc
 .svn/
 *.log
-*.cpp.eep
-*.cpp.elf
-*.cpp.hex
 
-**/bin/*.dll
-**/bin/*.exe
-**/bin/*.ilk
-**/bin/*.exp
-**/bin/*.pdb
-**/bin/*.lib
-**/data/sounds
+########################
+# IDE files which should
+# be ignored
+########################
 
 # XCode
 *.pbxuser
@@ -45,6 +63,20 @@ xcuserdata
 *.aps
 ipch/
 
+# Eclipse
+.metadata
+local.properties
+.externalToolBuilders
+
+##################
+# operating system
+##################
+
+# Linux
+*~
+# KDE
+.directory
+.AppleDouble
 
 # OSX
 .DS_Store
@@ -54,7 +86,10 @@ ipch/
 ._*
 
 # Windows
-# Windows image file caches
+# Image file caches
 Thumbs.db
 # Folder config file
 Desktop.ini
+
+# Android
+.csettings
