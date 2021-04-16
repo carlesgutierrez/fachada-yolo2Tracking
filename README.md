@@ -39,4 +39,15 @@ Download heavy Data and place it in the right place.
     - cfg and names are already included in this repo- 
  
  
-  
+  #### OSC: 
+
+	osc:/GameBlobAllIn
+	* - (int) Total num of Blobs "N"
+	Then "N" times:
+	* - (float) X [0 .. 1]
+	* - (float) Y [0 .. 1]
+	* - (float) W [0 .. W] // raw width blob detected from camera pixels...
+	* - (float) H [0 .. H] // raw height blob detected from camera pixels...
+	* - (int) id [0 .. N]  // ID blob 
+	* - (int) timeTracker [0 .. N]   // Time Tracked 
+
